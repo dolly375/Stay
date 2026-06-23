@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StayEasy — Find Your PG</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="nav"></div>
+
+<!-- ── Hero ──────────────────────────────────────────────── -->
+<section class="hero">
+  <div class="hero-content">
+    <h1>Find Your <span>Perfect PG</span></h1>
+    <p>Browse verified, admin-approved paying guest accommodations near you.</p>
+
+    <div class="search-box">
+      <input id="s-city"    type="text"   placeholder="🏙 City (e.g. Bangalore)">
+      <input id="s-minRent" type="number" placeholder="₹ Min Rent" min="0">
+      <input id="s-maxRent" type="number" placeholder="₹ Max Rent" min="0">
+      <select id="s-room">
+        <option value="">🛏 Room Type</option>
+        <option value="SINGLE">Single</option>
+        <option value="DOUBLE">Double</option>
+        <option value="TRIPLE">Triple</option>
+      </select>
+      <select id="s-fac">
+        <option value="">✨ Facility</option>
+        <option value="WiFi">WiFi</option>
+        <option value="Food">Food</option>
+        <option value="AC">AC</option>
+        <option value="Parking">Parking</option>
+        <option value="Gym">Gym</option>
+        <option value="Laundry">Laundry</option>
+        <option value="CCTV">CCTV</option>
+      </select>
+      <button class="btn btn-primary" onclick="doSearch()">🔍 Search</button>
+      <button class="btn btn-ghost btn-sm" onclick="clearSearch()">✕ Clear</button>
+    </div>
+  </div>
+</section>
+
+<!-- ── PG Listings ───────────────────────────────────────── -->
+<section class="section">
+  <div class="container">
+    <div style="display:flex;justify-content:space-between;align-items:center;
+         margin-bottom:1.5rem;flex-wrap:wrap;gap:.5rem;">
+      <div>
+        <h2 style="font-size:1.7rem;">Available PGs</h2>
+        <p id="count-label" style="color:var(--muted);font-size:0.9rem;margin-top:0.2rem;">
+          Loading…
+        </p>
+      </div>
+    </div>
+    <div class="pg-grid" id="pg-grid">
+      <div class="loader"><div class="spin"></div> Loading PGs…</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── How It Works ──────────────────────────────────────── -->
+<section class="section" style="background:#fff;">
+  <div class="container" style="text-align:center;">
+    <h2 style="font-size:1.7rem;margin-bottom:0.4rem;">How StayEasy Works</h2>
+    <p style="color:var(--muted);margin-bottom:2rem;">Simple steps to find your perfect stay</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:2rem;">
+      <div style="padding:1.5rem 1rem;">
+        <div style="font-size:2.5rem;margin-bottom:.8rem;">🔍</div>
+        <h3 style="font-size:1rem;margin-bottom:.4rem;">Search</h3>
+        <p style="font-size:.88rem;color:var(--muted);">Filter by city, budget, room type</p>
+      </div>
+      <div style="padding:1.5rem 1rem;">
+        <div style="font-size:2.5rem;margin-bottom:.8rem;">✅</div>
+        <h3 style="font-size:1rem;margin-bottom:.4rem;">Verified Listings</h3>
+        <p style="font-size:.88rem;color:var(--muted);">Every PG reviewed by our admin team</p>
+      </div>
+      <div style="padding:1.5rem 1rem;">
+        <div style="font-size:2.5rem;margin-bottom:.8rem;">📅</div>
+        <h3 style="font-size:1rem;margin-bottom:.4rem;">Book</h3>
+        <p style="font-size:.88rem;color:var(--muted);">Send a request, owner confirms</p>
+      </div>
+      <div style="padding:1.5rem 1rem;">
+        <div style="font-size:2.5rem;margin-bottom:.8rem;">🏠</div>
+        <h3 style="font-size:1rem;margin-bottom:.4rem;">Move In</h3>
+        <p style="font-size:.88rem;color:var(--muted);">Pack your bags and settle in!</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── PG Detail Modal ───────────────────────────────────── -->
+<div class="overlay" id="modal">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-head">
+      <h3 id="m-title">PG Details</h3>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="m-body">
+      <div class="loader"><div class="spin"></div></div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <p>© 2024 <strong>StayEasy</strong> — Finding homes, not just rooms.</p>
+</footer>
+
+<script src="app.js"></script>
+<script>
+  renderNav();
+
+  // ── Load PGs ───────────────────────────────────────────────
+  async function loadPgs(searchParams) {
+    // Show spinner
+    document.getElementById('pg-grid').innerHTML =
+      '<div class="loader"><div class="spin"></div> Loading…</div>';
+    document.getElementById('count-label').textContent = 'Loading…';
+
+    try {
+      let endpoint;
+      if (searchParams && Object.keys(searchParams).length > 0) {
+        endpoint = '/pg/search?' + new URLSearchParams(searchParams);
+      } else {
+        endpoint = '/pg/all';
+      }
+
+      const pgs = await Http.get(endpoint);
+
+      // Update count
+      if (!Array.isArray(pgs)) {
+        // Backend returned something unexpected
+        throw new Error('Invalid response from server');
+      }
+
+      document.getElementById('count-label').textContent =
+        pgs.length === 0
+          ? 'No PGs found'
+          : `${pgs.length} PG${pgs.length !== 1 ? 's' : ''} found`;
+
+      if (pgs.length === 0) {
+        document.getElementById('pg-grid').innerHTML = `
+          <div class="empty" style="grid-column:1/-1;">
+            <div class="icon">🏚</div>
+            <h3>No PGs found</h3>
+            <p style="color:var(--muted);font-size:.88rem;margin-top:.3rem;">
+              Try different search filters.
+            </p>
+          </div>`;
+        return;
+      }
+
+      // Render cards
+      document.getElementById('pg-grid').innerHTML =
+        pgs.map(pg => pgCard(pg, 'openPg')).join('');
+
+    } catch(err) {
+      document.getElementById('count-label').textContent = '';
+      document.getElementById('pg-grid').innerHTML = `
+        <div class="empty" style="grid-column:1/-1;">
+          <div class="icon">⚠️</div>
+          <h3>Could not connect to server</h3>
+          <p style="color:var(--muted);font-size:.88rem;margin-top:.3rem;">
+            Make sure the Spring Boot backend is running on
+            <strong>http://localhost:8080</strong>
+          </p>
+          <button class="btn btn-primary" style="margin-top:1rem;" onclick="loadPgs(null)">
+            🔄 Retry
+          </button>
+          <details style="margin-top:.8rem;font-size:.8rem;color:var(--muted);">
+            <summary>Error details</summary>
+            <code style="display:block;margin-top:.4rem;padding:.5rem;background:#f1f1f1;
+              border-radius:6px;text-align:left;">${err.message}</code>
+          </details>
+        </div>`;
+    }
+  }
+
+  // ── Search ────────────────────────────────────────────────
+  function doSearch() {
+    const params = {};
+    const city    = document.getElementById('s-city').value.trim();
+    const minRent = document.getElementById('s-minRent').value;
+    const maxRent = document.getElementById('s-maxRent').value;
+    const room    = document.getElementById('s-room').value;
+    const fac     = document.getElementById('s-fac').value;
+
+    if (city)    params.city     = city;
+    if (minRent) params.minRent  = minRent;
+    if (maxRent) params.maxRent  = maxRent;
+    if (room)    params.roomType = room;
+    if (fac)     params.facility = fac;
+
+    loadPgs(params);
+  }
+
+  function clearSearch() {
+    document.getElementById('s-city').value    = '';
+    document.getElementById('s-minRent').value = '';
+    document.getElementById('s-maxRent').value = '';
+    document.getElementById('s-room').value    = '';
+    document.getElementById('s-fac').value     = '';
+    loadPgs(null);
+  }
+
+  // Allow pressing Enter to search
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter') doSearch();
+  });
+
+  // ── PG Detail Modal ───────────────────────────────────────
+  async function openPg(id) {
+    document.getElementById('modal').classList.add('open');
+    document.getElementById('m-title').textContent = 'Loading…';
+    document.getElementById('m-body').innerHTML =
+      '<div class="loader"><div class="spin"></div></div>';
+
+    try {
+      const pg = await Http.get(`/pg/${id}`);
+      document.getElementById('m-title').textContent = pg.title;
+
+      const u       = Auth.user();
+      const canBook = u?.role === 'USER';
+      const today   = new Date().toISOString().split('T')[0];
+      const facs    = (pg.facilities || '').split(',').filter(Boolean);
+
+      document.getElementById('m-body').innerHTML = `
+        ${pg.imageUrl
+          ? `<img src="http://localhost:8080${pg.imageUrl}"
+               style="width:100%;height:220px;object-fit:cover;border-radius:10px;margin-bottom:1.2rem;"
+               onerror="this.style.display='none'">`
+          : `<div style="height:150px;background:var(--brand-lt);border-radius:10px;
+               display:flex;align-items:center;justify-content:center;
+               font-size:4rem;margin-bottom:1.2rem;">🏠</div>`
+        }
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+          <div>
+            <div style="font-size:.72rem;text-transform:uppercase;font-weight:800;color:var(--muted);">Location</div>
+            <div style="font-weight:700;">📍 ${pg.area}, ${pg.city}</div>
+            <div style="font-size:.82rem;color:var(--muted);">${pg.address || ''}</div>
+          </div>
+          <div>
+            <div style="font-size:.72rem;text-transform:uppercase;font-weight:800;color:var(--muted);">Monthly Rent</div>
+            <div style="font-size:1.5rem;font-weight:800;color:var(--brand);">
+              ₹${Number(pg.rent).toLocaleString('en-IN')}
+              <span style="font-size:.8rem;font-weight:400;color:var(--muted);">/mo</span>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:.72rem;text-transform:uppercase;font-weight:800;color:var(--muted);">Room Type</div>
+            <span class="tag blue">${pg.roomType}</span>
+          </div>
+          <div>
+            <div style="font-size:.72rem;text-transform:uppercase;font-weight:800;color:var(--muted);">Owner</div>
+            <div style="font-weight:700;">${pg.ownerName || '—'}</div>
+            <div style="font-size:.8rem;color:var(--muted);">${pg.ownerEmail || ''}</div>
+            ${pg.ownerPhone
+              ? `<div style="font-size:.8rem;color:var(--muted);">📞 ${pg.ownerPhone}</div>`
+              : ''}
+          </div>
+        </div>
+
+        <div style="margin-bottom:1rem;">
+          <div style="font-size:.72rem;text-transform:uppercase;font-weight:800;
+               color:var(--muted);margin-bottom:.4rem;">Facilities</div>
+          <div class="tags">
+            ${facs.length
+              ? facs.map(f => `<span class="tag">${f}</span>`).join('')
+              : '<span style="color:var(--muted);">None listed</span>'}
+          </div>
+        </div>
+
+        ${pg.description
+          ? `<p style="font-size:.88rem;color:var(--muted);margin-bottom:1rem;
+               line-height:1.6;">${pg.description}</p>`
+          : ''}
+
+        ${canBook ? `
+          <div style="border-top:1px solid var(--border);padding-top:1rem;margin-top:.5rem;">
+            <h4 style="margin-bottom:.9rem;font-size:1rem;">📅 Book This PG</h4>
+            <div class="form-row" style="margin-bottom:.9rem;">
+              <div class="form-group">
+                <label class="form-label">Move-in Date *</label>
+                <input type="date" class="form-control" id="b-date" min="${today}">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Message to Owner</label>
+                <input type="text" class="form-control" id="b-msg"
+                  placeholder="Any note for the owner…">
+              </div>
+            </div>
+            <div id="book-err" style="display:none;"></div>
+            <button class="btn btn-primary"
+              style="width:100%;justify-content:center;padding:.7rem;"
+              id="book-btn" onclick="book(${pg.id})">
+              📅 Send Booking Request
+            </button>
+            <p style="font-size:.78rem;color:var(--muted);margin-top:.5rem;text-align:center;">
+              The owner will confirm or reject your request.
+            </p>
+          </div>
+        ` : !u ? `
+          <div class="alert alert-info" style="margin-top:.5rem;">
+            <a href="/pages/login.html" style="font-weight:700;color:inherit;">
+              Login as a Customer
+            </a> to book this PG.
+          </div>
+        ` : u.role === 'OWNER' ? `
+          <div class="alert alert-info" style="margin-top:.5rem;">
+            Switch to a customer account to book PGs.
+          </div>
+        ` : ''}`;
+
+    } catch(err) {
+      document.getElementById('m-body').innerHTML =
+        `<div class="alert alert-error">${err.message}</div>`;
+    }
+  }
+
+  // ── Book a PG ─────────────────────────────────────────────
+  async function book(pgId) {
+    const date   = document.getElementById('b-date')?.value;
+    const msg    = document.getElementById('b-msg')?.value?.trim();
+    const errEl  = document.getElementById('book-err');
+    const btn    = document.getElementById('book-btn');
+
+    errEl.style.display = 'none';
+
+    if (!date) {
+      errEl.style.display = 'block';
+      errEl.innerHTML = '<div class="alert alert-error">Please select a move-in date.</div>';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Sending request…';
+
+    try {
+      await Http.post('/booking/create', {
+        pgId:        pgId,
+        bookingDate: date,
+        message:     msg || null
+      });
+      Toast.show('🎉 Booking request sent! Owner will confirm shortly.', 'ok', 5000);
+      closeModal();
+    } catch(err) {
+      errEl.style.display = 'block';
+      errEl.innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+      btn.disabled = false;
+      btn.textContent = '📅 Send Booking Request';
+    }
+  }
+
+  function closeModal() {
+    document.getElementById('modal').classList.remove('open');
+  }
+
+  // Close modal when clicking the dark backdrop
+  document.getElementById('modal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+  });
+
+  // ── Initial load ──────────────────────────────────────────
+  loadPgs(null);
+</script>
+</body>
+</html>

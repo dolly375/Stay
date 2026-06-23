@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Dashboard — StayEasy</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="nav"></div>
+
+<div class="dash-layout">
+  <aside class="sidebar">
+    <div class="sidebar-brand">🏠 StayEasy</div>
+    <nav class="sidebar-nav">
+      <button class="s-link active" onclick="tab('bookings',this)">📅 My Bookings</button>
+      <button class="s-link"       onclick="tab('browse',this)">🔍 Browse PGs</button>
+      <button class="s-link"       onclick="tab('profile',this)">👤 Profile</button>
+      <button class="s-link" style="color:#f87171;margin-top:auto;" onclick="Auth.logout()">🚪 Logout</button>
+    </nav>
+  </aside>
+
+  <main class="dash-main">
+    <div class="dash-title" id="welcome">Welcome!</div>
+    <div class="dash-sub">Manage your PG bookings here.</div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-icon">📅</div><div class="stat-label">Total</div><div class="stat-val" id="s-total">—</div></div>
+      <div class="stat-card"><div class="stat-icon">⏳</div><div class="stat-label">Pending</div><div class="stat-val" id="s-pend" style="color:var(--yellow);">—</div></div>
+      <div class="stat-card"><div class="stat-icon">✅</div><div class="stat-label">Confirmed</div><div class="stat-val" id="s-conf" style="color:var(--green);">—</div></div>
+      <div class="stat-card"><div class="stat-icon">❌</div><div class="stat-label">Cancelled</div><div class="stat-val" id="s-canc" style="color:var(--red);">—</div></div>
+    </div>
+
+    <!-- Bookings Tab -->
+    <div id="tab-bookings">
+      <div class="card">
+        <div class="card-header">
+          <h3>📅 My Bookings</h3>
+          <a href="index.html" class="btn btn-primary btn-sm">+ Find PGs</a>
+        </div>
+        <div id="bookings-list"><div class="loader"><div class="spin"></div></div></div>
+      </div>
+    </div>
+
+    <!-- Browse Tab -->
+    <div id="tab-browse" style="display:none;">
+      <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1.2rem;align-items:center;">
+        <input class="form-control" type="text" id="b-city" placeholder="City" style="flex:1;min-width:130px;">
+        <input class="form-control" type="number" id="b-max" placeholder="Max Rent ₹" style="flex:1;min-width:130px;">
+        <select class="form-control" id="b-room" style="flex:1;min-width:130px;">
+          <option value="">Room Type</option>
+          <option value="SINGLE">Single</option>
+          <option value="DOUBLE">Double</option>
+          <option value="TRIPLE">Triple</option>
+        </select>
+        <button class="btn btn-primary" onclick="browseSearch()">Search</button>
+      </div>
+      <div class="pg-grid" id="browse-grid"><div class="loader"><div class="spin"></div></div></div>
+    </div>
+
+    <!-- Profile Tab -->
+    <div id="tab-profile" style="display:none;">
+      <div class="card" style="max-width:440px;">
+        <div class="card-header"><h3>👤 My Profile</h3></div>
+        <div id="profile-body" style="padding:1.4rem;"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="app.js"></script>
+<script>
+  if (!Auth.guard('USER')) {}
+  const u = Auth.user();
+  renderNav();
+  document.getElementById('welcome').textContent = `Hi, ${u.name.split(' ')[0]}! 👋`;
+
+  function tab(name, btn) {
+    ['bookings','browse','profile'].forEach(t => document.getElementById('tab-'+t).style.display='none');
+    document.querySelectorAll('.s-link').forEach(b=>b.classList.remove('active'));
+    document.getElementById('tab-'+name).style.display='block';
+    btn.classList.add('active');
+    if (name==='bookings') loadBookings();
+    if (name==='browse')   browseSearch();
+    if (name==='profile')  loadProfile();
+  }
+
+  async function loadBookings() {
+    loader('bookings-list');
+    try {
+      const bks = await Http.get('/booking/my-bookings');
+      document.getElementById('s-total').textContent = bks.length;
+      document.getElementById('s-pend').textContent  = bks.filter(b=>b.status==='PENDING').length;
+      document.getElementById('s-conf').textContent  = bks.filter(b=>b.status==='CONFIRMED').length;
+      document.getElementById('s-canc').textContent  = bks.filter(b=>b.status==='CANCELLED').length;
+
+      if (!bks.length) {
+        document.getElementById('bookings-list').innerHTML = `
+          <div class="empty"><div class="icon">📭</div><h3>No bookings yet</h3>
+          <a href="index.html" class="btn btn-primary" style="margin-top:.8rem;">Browse PGs</a></div>`;
+        return;
+      }
+      document.getElementById('bookings-list').innerHTML = `
+        <div class="table-wrap"><table>
+          <thead><tr><th>PG ID</th><th>Move-in Date</th><th>Status</th><th>Message</th><th>Action</th></tr></thead>
+          <tbody>
+            ${bks.map(b=>`<tr>
+              <td><strong>#${b.pgId}</strong></td>
+              <td>${fmtDate(b.bookingDate)}</td>
+              <td><span class="badge badge-${b.status}">${b.status}</span></td>
+              <td style="color:var(--muted);font-size:.82rem;">${b.message||'—'}</td>
+              <td>${b.status!=='CANCELLED'
+                ? `<button class="btn btn-danger btn-sm" onclick="cancelBook(${b.id})">Cancel</button>`
+                : '—'}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table></div>`;
+    } catch(e) {
+      document.getElementById('bookings-list').innerHTML = `<div class="alert alert-error" style="margin:1rem;">${e.message}</div>`;
+    }
+  }
+
+  // ── Overview ───────────────────────────────────────────────
+  async function loadStats() {
+    try {
+      const s = await Http.get('/admin/dashboard');
+      document.getElementById('stats-grid').innerHTML = `
+        <div class="stat-card"><div class="stat-icon">👤</div><div class="stat-label">Users</div><div class="stat-val">${s.totalUsers}</div></div>
+        <div class="stat-card"><div class="stat-icon">🏠</div><div class="stat-label">Owners</div><div class="stat-val">${s.totalOwners}</div></div>
+        <div class="stat-card"><div class="stat-icon">⏳</div><div class="stat-label">Pending PGs</div><div class="stat-val" style="color:var(--yellow);">${s.pendingPgs}</div></div>
+        <div class="stat-card"><div class="stat-icon">✅</div><div class="stat-label">Approved PGs</div><div class="stat-val" style="color:var(--green);">${s.approvedPgs}</div></div>
+        <div class="stat-card"><div class="stat-icon">❌</div><div class="stat-label">Rejected PGs</div><div class="stat-val" style="color:var(--red);">${s.rejectedPgs}</div></div>`;
+    } catch(e) {
+      document.getElementById('stats-grid').innerHTML =
+        `<div class="alert alert-error">${e.message}</div>`;
+    }
+  }
+
+  async function cancelBook(id) {
+    if (!confirm('Cancel this booking?')) return;
+    try {
+      await Http.put(`/booking/cancel/${id}`);
+      Toast.show('Booking cancelled.', 'ok');
+      loadBookings();
+    } catch(e) { Toast.show(e.message, 'err'); }
+  }
+
+  async function browseSearch() {
+    loader('browse-grid');
+    const city = document.getElementById('b-city')?.value||'';
+    const max  = document.getElementById('b-max')?.value||'';
+    const room = document.getElementById('b-room')?.value||'';
+    const p = {};
+    if (city) p.city=city; if (max) p.maxRent=max; if (room) p.roomType=room;
+    try {
+      const pgs = await Http.get('/pg/search?' + new URLSearchParams(p));
+      if (!pgs.length) { empty('browse-grid','No PGs found','🏚'); return; }
+      document.getElementById('browse-grid').innerHTML = pgs.map(pg=>pgCard(pg,'viewPg')).join('');
+    } catch(e) { empty('browse-grid','Error loading PGs','⚠️'); }
+  }
+
+  function viewPg(id) { window.open('index.html','_blank'); }
+
+  function loadProfile() {
+    document.getElementById('profile-body').innerHTML = `
+      <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.2rem;">
+        <div style="width:52px;height:52px;border-radius:50%;background:var(--brand-lt);display:flex;align-items:center;justify-content:center;font-size:1.4rem;">👤</div>
+        <div><div style="font-weight:700;font-size:1.05rem;">${u.name}</div><div style="color:var(--muted);font-size:.85rem;">${u.email}</div></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:.7rem;background:var(--bg);border-radius:8px;margin-bottom:.6rem;">
+        <span style="color:var(--muted);font-size:.85rem;">Role</span><span class="tag blue">CUSTOMER</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:.7rem;background:var(--bg);border-radius:8px;margin-bottom:1rem;">
+        <span style="color:var(--muted);font-size:.85rem;">User ID</span><span style="font-weight:700;">#${u.id}</span>
+      </div>
+      <button class="btn btn-danger btn-sm" onclick="Auth.logout()">Logout</button>`;
+  }
+
+  // Init
+  loadBookings();
+</script>
+</body>
+</html>

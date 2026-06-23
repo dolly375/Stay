@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Owner Dashboard — StayEasy</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="nav"></div>
+
+<div class="dash-layout">
+  <aside class="sidebar">
+    <div class="sidebar-brand">🏠 StayEasy</div>
+    <nav class="sidebar-nav">
+      <button class="s-link active" onclick="tab('listings',this)">🏠 My Listings</button>
+      <button class="s-link"       onclick="tab('bookings',this)">
+        📅 Booking Requests
+        <span id="pending-badge" style="display:none;background:var(--red);color:#fff;
+          border-radius:50px;padding:1px 7px;font-size:0.72rem;margin-left:4px;"></span>
+      </button>
+      <button class="s-link"       onclick="tab('add',this)">➕ Add PG</button>
+      <button class="s-link"       onclick="tab('profile',this)">👤 Profile</button>
+      <button class="s-link" style="color:#f87171;margin-top:auto;" onclick="Auth.logout()">🚪 Logout</button>
+    </nav>
+  </aside>
+
+  <main class="dash-main">
+    <div class="dash-title" id="welcome">Owner Dashboard</div>
+    <div class="dash-sub">Manage your PG listings and tenant booking requests.</div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon">🏠</div>
+        <div class="stat-label">My PGs</div>
+        <div class="stat-val" id="s-pgs">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">📬</div>
+        <div class="stat-label">New Requests</div>
+        <div class="stat-val" id="s-new" style="color:var(--yellow);">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">✅</div>
+        <div class="stat-label">Confirmed</div>
+        <div class="stat-val" id="s-conf" style="color:var(--green);">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">❌</div>
+        <div class="stat-label">Rejected</div>
+        <div class="stat-val" id="s-rej" style="color:var(--red);">—</div>
+      </div>
+    </div>
+
+    <!-- ── Tab: My Listings ─────────────────────────────── -->
+    <div id="tab-listings">
+      <div class="card">
+        <div class="card-header">
+          <h3>🏠 My PG Listings</h3>
+          <button class="btn btn-primary btn-sm"
+            onclick="tab('add', document.querySelectorAll('.s-link')[2])">+ Add PG</button>
+        </div>
+        <div id="listings-body">
+          <div class="loader"><div class="spin"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Tab: Booking Requests ──────────────────────── -->
+    <div id="tab-bookings" style="display:none;">
+
+      <!-- Filter row -->
+      <div style="display:flex;gap:0.5rem;margin-bottom:1.2rem;flex-wrap:wrap;align-items:center;">
+        <button class="btn btn-primary btn-sm filter-btn" onclick="filterBookings('ALL',this)">All</button>
+        <button class="btn btn-ghost  btn-sm filter-btn" onclick="filterBookings('PENDING',this)">⏳ Pending</button>
+        <button class="btn btn-ghost  btn-sm filter-btn" onclick="filterBookings('CONFIRMED',this)">✅ Confirmed</button>
+        <button class="btn btn-ghost  btn-sm filter-btn" onclick="filterBookings('REJECTED',this)">❌ Rejected</button>
+        <button class="btn btn-ghost  btn-sm filter-btn" onclick="filterBookings('CANCELLED',this)">🚫 Cancelled</button>
+        <button class="btn btn-ghost  btn-sm" style="margin-left:auto;" onclick="loadBookings()">🔄 Refresh</button>
+      </div>
+
+      <div id="bookings-body">
+        <div class="loader"><div class="spin"></div></div>
+      </div>
+    </div>
+
+    <!-- ── Tab: Add / Edit PG ─────────────────────────── -->
+    <div id="tab-add" style="display:none;">
+      <div class="card" style="max-width:680px;">
+        <div class="card-header">
+          <h3 id="form-title">➕ Add New PG</h3>
+        </div>
+        <div style="padding:1.4rem;">
+          <div id="form-err" style="display:none;"></div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">PG Name *</label>
+              <input class="form-control" id="f-title" placeholder="Green Valley PG">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Room Type *</label>
+              <select class="form-control" id="f-room">
+                <option value="SINGLE">Single</option>
+                <option value="DOUBLE">Double</option>
+                <option value="TRIPLE">Triple</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">City *</label>
+              <input class="form-control" id="f-city" placeholder="Bangalore">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Area *</label>
+              <input class="form-control" id="f-area" placeholder="Koramangala">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Full Address *</label>
+            <input class="form-control" id="f-addr" placeholder="5th Block, Koramangala, Bangalore 560034">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Monthly Rent (₹) *</label>
+            <input class="form-control" type="number" id="f-rent" placeholder="8500">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Facilities</label>
+            <div class="fac-grid" id="fac-grid"></div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Description</label>
+            <textarea class="form-control" id="f-desc" rows="3"
+              placeholder="Tell tenants about your PG — food, rules, nearby landmarks…"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">PG Photo</label>
+            <input class="form-control" type="file" id="f-img"
+              accept="image/*" onchange="previewImg(event)">
+            <div id="img-prev" style="margin-top:0.6rem;"></div>
+          </div>
+
+          <div style="display:flex;gap:0.6rem;margin-top:0.5rem;">
+            <button class="btn btn-primary" id="submit-btn" onclick="submitPg()">
+              🚀 Submit Listing
+            </button>
+            <button class="btn btn-ghost" onclick="resetForm()">Reset</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Tab: Profile ───────────────────────────────── -->
+    <div id="tab-profile" style="display:none;">
+      <div class="card" style="max-width:420px;">
+        <div class="card-header"><h3>👤 Profile</h3></div>
+        <div id="profile-body" style="padding:1.4rem;"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Delete Confirm Modal -->
+<div class="overlay" id="del-modal">
+  <div class="modal" style="max-width:360px;">
+    <div class="modal-head">
+      <h3>Delete PG?</h3>
+      <button class="modal-close" onclick="closeDelModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p>This will permanently remove this PG listing and all its bookings.</p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost"  onclick="closeDelModal()">Cancel</button>
+      <button class="btn btn-danger" id="del-confirm">Yes, Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Booking Detail Modal -->
+<div class="overlay" id="booking-modal">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-head">
+      <h3>Booking Request Details</h3>
+      <button class="modal-close" onclick="closeBookingModal()">✕</button>
+    </div>
+    <div class="modal-body"  id="booking-modal-body"></div>
+    <div class="modal-foot" id="booking-modal-foot"></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+  if (!Auth.guard('OWNER')) {}
+  const u = Auth.user();
+  renderNav();
+  document.getElementById('welcome').textContent = `Hi, ${u.name.split(' ')[0]}! 👋`;
+
+  let editId       = null;
+  let allBookings  = [];
+  let currentFilter = 'ALL';
+
+  buildFacChecks('fac-grid');
+
+  // ── Tab switching ────────────────────────────────────────
+  function tab(name, btn) {
+    ['listings','bookings','add','profile'].forEach(t =>
+      document.getElementById('tab-' + t).style.display = 'none');
+    document.querySelectorAll('.s-link').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + name).style.display = 'block';
+    if (btn) btn.classList.add('active');
+
+    if (name === 'listings') loadListings();
+    if (name === 'bookings') loadBookings();
+    if (name === 'profile')  loadProfile();
+    if (name === 'add' && !editId) resetForm();
+  }
+
+  // ── My Listings ──────────────────────────────────────────
+  async function loadListings() {
+    loader('listings-body');
+    try {
+      const pgs = await Http.get('/pg/my-listings');
+      document.getElementById('s-pgs').textContent = pgs.length;
+
+      if (!pgs.length) {
+        document.getElementById('listings-body').innerHTML = `
+          <div class="empty">
+            <div class="icon">🏚</div>
+            <h3>No listings yet</h3>
+            <p style="margin-bottom:0.8rem;">Submit your first PG to start receiving tenants!</p>
+            <button class="btn btn-primary" onclick="tab('add',null)">+ Add PG</button>
+          </div>`;
+        return;
+      }
+
+      document.getElementById('listings-body').innerHTML = `
+        <div class="table-wrap"><table>
+          <thead><tr>
+            <th>PG Name</th><th>Location</th><th>Rent</th>
+            <th>Type</th><th>Status</th><th>Admin Remark</th><th>Actions</th>
+          </tr></thead>
+          <tbody>
+            ${pgs.map(pg => `<tr>
+              <td><strong>${pg.title}</strong></td>
+              <td>${pg.area}, ${pg.city}</td>
+              <td>₹${Number(pg.rent).toLocaleString('en-IN')}</td>
+              <td><span class="tag blue">${pg.roomType}</span></td>
+              <td><span class="badge badge-${pg.status}">${pg.status}</span></td>
+              <td style="font-size:0.78rem;color:var(--muted);max-width:150px;">
+                ${pg.adminRemark || '—'}
+              </td>
+              <td>
+                <div style="display:flex;gap:0.35rem;">
+                  <button class="btn btn-ghost btn-sm" onclick="editPg(${pg.id})">✏️ Edit</button>
+                  <button class="btn btn-danger btn-sm" onclick="openDelModal(${pg.id})">🗑️</button>
+                </div>
+              </td>
+            </tr>`).join('')}
+          </tbody>
+        </table></div>`;
+    } catch(e) {
+      document.getElementById('listings-body').innerHTML =
+        `<div class="alert alert-error" style="margin:1rem;">${e.message}</div>`;
+    }
+  }
+
+  // ── Booking Requests ─────────────────────────────────────
+  async function loadBookings() {
+    loader('bookings-body');
+    try {
+      allBookings = await Http.get('/booking/owner-requests');
+
+      // update stat cards
+      document.getElementById('s-new').textContent  = allBookings.filter(b => b.status === 'PENDING').length;
+      document.getElementById('s-conf').textContent = allBookings.filter(b => b.status === 'CONFIRMED').length;
+      document.getElementById('s-rej').textContent  = allBookings.filter(b => b.status === 'REJECTED').length;
+
+      // sidebar badge
+      const pendingCount = allBookings.filter(b => b.status === 'PENDING').length;
+      const badge = document.getElementById('pending-badge');
+      if (pendingCount > 0) { badge.style.display = 'inline'; badge.textContent = pendingCount; }
+      else                  { badge.style.display = 'none'; }
+
+      renderBookings(currentFilter);
+    } catch(e) {
+      document.getElementById('bookings-body').innerHTML =
+        `<div class="alert alert-error">${e.message}</div>`;
+    }
+  }
+
+  function filterBookings(status, btn) {
+    currentFilter = status;
+    document.querySelectorAll('.filter-btn').forEach(b => {
+      b.classList.remove('btn-primary'); b.classList.add('btn-ghost');
+    });
+    btn.classList.add('btn-primary'); btn.classList.remove('btn-ghost');
+    renderBookings(status);
+  }
+
+  function renderBookings(filter) {
+    const list = filter === 'ALL'
+      ? allBookings
+      : allBookings.filter(b => b.status === filter);
+
+    if (!list.length) {
+      document.getElementById('bookings-body').innerHTML = `
+        <div class="empty">
+          <div class="icon">📭</div>
+          <h3>${filter === 'ALL'
+            ? 'No booking requests yet'
+            : 'No ' + filter.toLowerCase() + ' bookings'}</h3>
+          <p style="color:var(--muted);font-size:0.88rem;margin-top:0.3rem;">
+            ${filter === 'ALL'
+              ? 'When a user books your PG, the request will appear here for you to approve or reject.'
+              : ''}
+          </p>
+        </div>`;
+      return;
+    }
+
+    document.getElementById('bookings-body').innerHTML = list.map(b => `
+      <div style="background:#fff;border-radius:12px;box-shadow:var(--shadow);
+           margin-bottom:1rem;overflow:hidden;
+           border-left:5px solid ${statusColor(b.status)};">
+        <div style="padding:1.1rem 1.3rem;">
+
+          <!-- Header -->
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;
+               flex-wrap:wrap;gap:0.5rem;margin-bottom:0.9rem;">
+            <div>
+              <div style="font-weight:800;font-size:1rem;">
+                ${b.pgTitle || 'PG #' + b.pgId}
+              </div>
+              <div style="color:var(--muted);font-size:0.82rem;">
+                📍 ${b.pgCity || ''} ${b.pgArea ? '— ' + b.pgArea : ''}
+              </div>
+            </div>
+            <span class="badge badge-${b.status}" style="font-size:0.8rem;">
+              ${statusLabel(b.status)}
+            </span>
+          </div>
+
+          <!-- Tenant info box -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.7rem;
+               background:var(--bg);border-radius:8px;padding:0.8rem;margin-bottom:0.9rem;">
+            <div>
+              <div style="font-size:0.7rem;text-transform:uppercase;font-weight:800;
+                   color:var(--muted);margin-bottom:0.2rem;">Tenant</div>
+              <div style="font-weight:700;">${b.userName || '—'}</div>
+              <div style="font-size:0.8rem;color:var(--blue);">
+                ✉️ <a href="mailto:${b.userEmail}" style="color:inherit;">${b.userEmail || '—'}</a>
+              </div>
+              ${b.userPhone
+                ? `<div style="font-size:0.8rem;color:var(--muted);">📞 ${b.userPhone}</div>`
+                : ''}
+            </div>
+            <div>
+              <div style="font-size:0.7rem;text-transform:uppercase;font-weight:800;
+                   color:var(--muted);margin-bottom:0.2rem;">Requested Move-in</div>
+              <div style="font-weight:800;font-size:1.05rem;">${fmtDate(b.bookingDate)}</div>
+              <div style="font-size:0.78rem;color:var(--muted);">
+                Sent on ${fmtDate(b.createdAt)}
+              </div>
+            </div>
+          </div>
+
+          <!-- Message from tenant -->
+          ${b.message ? `
+            <div style="background:#EFF6FF;border-radius:8px;padding:0.7rem 0.9rem;
+                 margin-bottom:0.9rem;font-size:0.86rem;color:#1E40AF;">
+              💬 <em>"${b.message}"</em>
+            </div>` : ''}
+
+          <!-- Action buttons -->
+          ${b.status === 'PENDING' ? `
+            <div style="display:flex;gap:0.6rem;flex-wrap:wrap;align-items:center;">
+              <button class="btn btn-success" onclick="confirmBooking(${b.bookingId})">
+                ✅ Confirm Booking
+              </button>
+              <button class="btn btn-danger" onclick="rejectBooking(${b.bookingId})">
+                ❌ Reject
+              </button>
+              <button class="btn btn-ghost btn-sm" onclick="openBookingDetail(${b.bookingId})">
+                View Full Details
+              </button>
+            </div>
+          ` : `
+            <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;">
+              <span style="font-size:0.84rem;color:var(--muted);">
+                ${b.status === 'CONFIRMED'
+                  ? '✅ You confirmed this booking. Reach out to the tenant to coordinate.'
+                  : b.status === 'REJECTED'
+                  ? '❌ You rejected this request.'
+                  : '🚫 The tenant cancelled this booking.'}
+              </span>
+              <button class="btn btn-ghost btn-sm" onclick="openBookingDetail(${b.bookingId})">
+                Details
+              </button>
+            </div>
+          `}
+        </div>
+      </div>`).join('');
+  }
+
+  function statusColor(s) {
+    return s === 'CONFIRMED' ? 'var(--green)'
+         : s === 'REJECTED'  ? 'var(--red)'
+         : s === 'CANCELLED' ? 'var(--muted)'
+         : 'var(--yellow)';
+  }
+
+  function statusLabel(s) {
+    return s === 'PENDING'   ? '⏳ Awaiting Your Decision'
+         : s === 'CONFIRMED' ? '✅ Confirmed'
+         : s === 'REJECTED'  ? '❌ Rejected'
+         : '🚫 Cancelled by Tenant';
+  }
+
+  // ── Confirm a booking ────────────────────────────────────
+  async function confirmBooking(bookingId) {
+    try {
+      await Http.put(`/booking/confirm/${bookingId}`);
+      Toast.show('✅ Booking confirmed! The tenant has been notified.', 'ok');
+      loadBookings();
+    } catch(e) { Toast.show(e.message, 'err'); }
+  }
+
+  // ── Reject a booking ─────────────────────────────────────
+  async function rejectBooking(bookingId) {
+    if (!confirm('Reject this booking request?\nThe tenant will see this status update.')) return;
+    try {
+      await Http.put(`/booking/reject/${bookingId}`);
+      Toast.show('Booking rejected.', 'ok');
+      loadBookings();
+    } catch(e) { Toast.show(e.message, 'err'); }
+  }
+
+  // ── Booking detail modal ─────────────────────────────────
+  function openBookingDetail(bookingId) {
+    const b = allBookings.find(x => x.bookingId === bookingId);
+    if (!b) return;
+
+    document.getElementById('booking-modal').classList.add('open');
+    document.getElementById('booking-modal-body').innerHTML = `
+      <div style="display:grid;gap:0.85rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <strong style="font-size:1.05rem;">${b.pgTitle || 'PG #' + b.pgId}</strong>
+          <span class="badge badge-${b.status}">${b.status}</span>
+        </div>
+
+        <hr style="border:none;border-top:1px solid var(--border);">
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;">
+          <div>
+            <div style="font-size:0.7rem;font-weight:800;text-transform:uppercase;color:var(--muted);">Tenant Name</div>
+            <div style="font-weight:700;">${b.userName || '—'}</div>
+          </div>
+          <div>
+            <div style="font-size:0.7rem;font-weight:800;text-transform:uppercase;color:var(--muted);">Email</div>
+            <div><a href="mailto:${b.userEmail}" style="color:var(--blue);">${b.userEmail || '—'}</a></div>
+          </div>
+          <div>
+            <div style="font-size:0.7rem;font-weight:800;text-transform:uppercase;color:var(--muted);">Phone</div>
+            <div>${b.userPhone || 'Not provided'}</div>
+          </div>
+          <div>
+            <div style="font-size:0.7rem;font-weight:800;text-transform:uppercase;color:var(--muted);">Move-in Date</div>
+            <div style="font-weight:800;">${fmtDate(b.bookingDate)}</div>
+          </div>
+          <div>
+            <div style="font-size:0.7rem;font-weight:800;text-transform:uppercase;color:var(--muted);">PG Address</div>
+            <div style="font-size:0.86rem;">${b.pgAddress || '—'}</div>
+          </div>
+          <div>
+            <div style="font-size:0.7rem;font-weight:800;text-transform:uppercase;color:var(--muted);">Request Sent</div>
+            <div>${fmtDate(b.createdAt)}</div>
+          </div>
+        </div>
+
+        ${b.message ? `
+          <div style="background:#EFF6FF;padding:0.9rem;border-radius:8px;font-size:0.88rem;color:#1E40AF;">
+            <strong>Tenant's message:</strong><br><em>"${b.message}"</em>
+          </div>` : ''}
+      </div>`;
+
+    document.getElementById('booking-modal-foot').innerHTML =
+      b.status === 'PENDING' ? `
+        <button class="btn btn-ghost"  onclick="closeBookingModal()">Close</button>
+        <button class="btn btn-danger" onclick="rejectBooking(${b.bookingId});closeBookingModal()">❌ Reject</button>
+        <button class="btn btn-success" onclick="confirmBooking(${b.bookingId});closeBookingModal()">✅ Confirm</button>
+      ` : `
+        <button class="btn btn-primary" onclick="closeBookingModal()">Close</button>`;
+  }
+
+  function closeBookingModal() {
+    document.getElementById('booking-modal').classList.remove('open');
+  }
+
+  // ── Add / Edit PG ────────────────────────────────────────
+  async function submitPg() {
+    const title = document.getElementById('f-title').value.trim();
+    const city  = document.getElementById('f-city').value.trim();
+    const area  = document.getElementById('f-area').value.trim();
+    const addr  = document.getElementById('f-addr').value.trim();
+    const rent  = document.getElementById('f-rent').value;
+    const room  = document.getElementById('f-room').value;
+    const desc  = document.getElementById('f-desc').value.trim();
+    const facs  = getCheckedFacs('fac-grid');
+    const img   = document.getElementById('f-img').files[0];
+    const btn   = document.getElementById('submit-btn');
+    const errEl = document.getElementById('form-err');
+
+    errEl.style.display = 'none';
+    if (!title || !city || !area || !addr || !rent) {
+      errEl.style.display = 'block';
+      errEl.innerHTML = '<div class="alert alert-error">Please fill all required fields.</div>';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = editId ? 'Updating…' : 'Submitting…';
+
+    const fd = new FormData();
+    fd.append('title', title);   fd.append('city', city);
+    fd.append('area', area);     fd.append('address', addr);
+    fd.append('rent', rent);     fd.append('roomType', room);
+    if (facs) fd.append('facilities', facs);
+    if (desc) fd.append('description', desc);
+    if (img)  fd.append('image', img);
+
+    try {
+      if (editId) {
+        await Http.putForm(`/pg/${editId}`, fd);
+        Toast.show('PG updated! Awaiting re-approval.', 'ok');
+      } else {
+        await Http.postForm('/pg/add', fd);
+        Toast.show('PG submitted! Awaiting admin approval.', 'ok');
+      }
+      editId = null;
+      resetForm();
+      tab('listings', document.querySelector('.s-link'));
+    } catch(e) {
+      errEl.style.display = 'block';
+      errEl.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = editId ? '💾 Update PG' : '🚀 Submit Listing';
+    }
+  }
+
+  async function editPg(id) {
+    editId = id;
+    tab('add', null);
+    document.getElementById('form-title').textContent = '✏️ Edit PG Listing';
+    document.getElementById('submit-btn').textContent = '💾 Update PG';
+    try {
+      const pg = await Http.get(`/pg/${id}`);
+      document.getElementById('f-title').value = pg.title;
+      document.getElementById('f-city').value  = pg.city;
+      document.getElementById('f-area').value  = pg.area;
+      document.getElementById('f-addr').value  = pg.address;
+      document.getElementById('f-rent').value  = pg.rent;
+      document.getElementById('f-room').value  = pg.roomType;
+      document.getElementById('f-desc').value  = pg.description || '';
+      buildFacChecks('fac-grid', pg.facilities || '');
+    } catch(e) { Toast.show('Could not load PG data.', 'err'); }
+  }
+
+  function resetForm() {
+    editId = null;
+    ['f-title','f-city','f-area','f-addr','f-rent','f-desc'].forEach(id =>
+      document.getElementById(id).value = '');
+    document.getElementById('f-room').value = 'SINGLE';
+    document.getElementById('f-img').value = '';
+    document.getElementById('img-prev').innerHTML = '';
+    document.getElementById('form-err').style.display = 'none';
+    document.getElementById('form-title').textContent = '➕ Add New PG';
+    document.getElementById('submit-btn').textContent = '🚀 Submit Listing';
+    buildFacChecks('fac-grid');
+  }
+
+  function previewImg(e) {
+    const f = e.target.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = ev => document.getElementById('img-prev').innerHTML =
+      `<img src="${ev.target.result}"
+           style="width:100%;max-height:180px;object-fit:cover;border-radius:10px;">`;
+    r.readAsDataURL(f);
+  }
+
+  // ── Delete Modal ─────────────────────────────────────────
+  let delId = null;
+  function openDelModal(id) {
+    delId = id;
+    document.getElementById('del-modal').classList.add('open');
+    document.getElementById('del-confirm').onclick = async () => {
+      try {
+        await Http.del(`/pg/${delId}`);
+        Toast.show('PG listing deleted.', 'ok');
+        closeDelModal();
+        loadListings();
+      } catch(e) { Toast.show(e.message, 'err'); }
+    };
+  }
+  function closeDelModal() { document.getElementById('del-modal').classList.remove('open'); }
+
+  // ── Profile ──────────────────────────────────────────────
+  function loadProfile() {
+    document.getElementById('profile-body').innerHTML = `
+      <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.2rem;">
+        <div style="width:52px;height:52px;border-radius:50%;background:var(--brand-lt);
+             display:flex;align-items:center;justify-content:center;font-size:1.4rem;">🏠</div>
+        <div>
+          <div style="font-weight:800;">${u.name}</div>
+          <div style="color:var(--muted);font-size:0.85rem;">${u.email}</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:0.7rem;
+           background:var(--bg);border-radius:8px;margin-bottom:0.6rem;">
+        <span style="color:var(--muted);font-size:0.85rem;">Role</span>
+        <span class="tag blue">PG OWNER</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:0.7rem;
+           background:var(--bg);border-radius:8px;margin-bottom:1rem;">
+        <span style="color:var(--muted);font-size:0.85rem;">User ID</span>
+        <span style="font-weight:700;">#${u.id}</span>
+      </div>
+      <button class="btn btn-danger btn-sm" onclick="Auth.logout()">Logout</button>`;
+  }
+
+  // Close modals on backdrop click
+  ['del-modal','booking-modal'].forEach(id => {
+    document.getElementById(id).addEventListener('click', function(e) {
+      if (e.target === this) this.classList.remove('open');
+    });
+  });
+
+  // ── Init ─────────────────────────────────────────────────
+  loadListings();
+
+  // Silently fetch bookings to show badge count
+  Http.get('/booking/owner-requests').then(bks => {
+    const p = bks.filter(b => b.status === 'PENDING').length;
+    document.getElementById('s-new').textContent = p;
+    const badge = document.getElementById('pending-badge');
+    if (p > 0) { badge.style.display = 'inline'; badge.textContent = p; }
+  }).catch(() => {});
+</script>
+</body>
+</html>

@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register — StayEasy</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="auth-page">
+
+  <div class="auth-panel">
+    <div style="font-size:3rem;margin-bottom:1.2rem;">🚀</div>
+    <h2>Join StayEasy</h2>
+    <p>Find a PG or list your property — all in one place.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-top:2rem;width:100%;max-width:280px;">
+      <div style="background:rgba(255,255,255,.1);border-radius:10px;padding:1rem;text-align:center;">
+        <div style="font-size:1.6rem;">👤</div>
+        <div style="font-size:.82rem;margin-top:.4rem;font-weight:600;">As User</div>
+        <div style="font-size:.75rem;opacity:.7;">Browse &amp; book PGs</div>
+      </div>
+      <div style="background:rgba(255,255,255,.1);border-radius:10px;padding:1rem;text-align:center;">
+        <div style="font-size:1.6rem;">🏠</div>
+        <div style="font-size:.82rem;margin-top:.4rem;font-weight:600;">As Owner</div>
+        <div style="font-size:.75rem;opacity:.7;">List your PG</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="auth-form-wrap">
+    <div class="auth-form">
+      <a href="index.html" style="color:var(--brand);font-family:'Lora',serif;font-size:1.2rem;font-weight:700;display:block;margin-bottom:1.5rem;">🏠 StayEasy</a>
+      <h2>Create Account</h2>
+      <p class="sub">Already have one? <a href="login.html" style="color:var(--brand);font-weight:700;">Sign in</a></p>
+
+      <div class="role-tabs">
+        <button class="role-tab active" onclick="setRole('USER',this)">👤 I'm a Customer</button>
+        <button class="role-tab"       onclick="setRole('OWNER',this)">🏠 I'm an Owner</button>
+      </div>
+
+      <div id="info" class="alert alert-info" style="font-size:.84rem;">Register as a <strong>Customer</strong> to browse and book PGs.</div>
+      <div id="err" style="display:none;"></div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Full Name *</label>
+          <input class="form-control" type="text" id="name" placeholder="Ravi Kumar">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Phone</label>
+          <input class="form-control" type="tel" id="phone" placeholder="9876543210">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Email *</label>
+        <input class="form-control" type="email" id="email" placeholder="ravi@example.com">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Password *</label>
+          <input class="form-control" type="password" id="pwd" placeholder="Min 6 chars">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirm Password *</label>
+          <input class="form-control" type="password" id="cpwd" placeholder="Repeat">
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="btn" onclick="register()" style="width:100%;justify-content:center;padding:.7rem;">
+        Create Account →
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+  let role = 'USER';
+
+  if (Auth.loggedIn()) location.href = 'index.html';
+
+  function setRole(r, btn) {
+    role = r;
+    document.querySelectorAll('.role-tab').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('info').innerHTML = r === 'OWNER'
+      ? 'Register as an <strong>Owner</strong> to list your PG. Listings need admin approval.'
+      : 'Register as a <strong>Customer</strong> to browse and book PGs.';
+  }
+
+  function showErr(msg) {
+    const el = document.getElementById('err');
+    el.style.display='block';
+    el.innerHTML=`<div class="alert alert-error">${msg}</div>`;
+  }
+
+  async function register() {
+    const name  = document.getElementById('name').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const phone = document.getElementById('phone').value.trim();
+    const pwd   = document.getElementById('pwd').value;
+    const cpwd  = document.getElementById('cpwd').value;
+    const btn   = document.getElementById('btn');
+
+    document.getElementById('err').style.display='none';
+
+    if (!name||!email||!pwd)    { showErr('Name, email and password are required.'); return; }
+    if (pwd.length < 6)          { showErr('Password must be at least 6 characters.'); return; }
+    if (pwd !== cpwd)            { showErr('Passwords do not match.'); return; }
+
+    btn.disabled=true; btn.textContent='Creating account…';
+
+    try {
+      const data = await Http.post('/auth/register', { name, email, password:pwd, role, phone });
+      Auth.save(data);
+      Toast.show('Account created! 🎉', 'ok');
+      setTimeout(() => {
+        location.href = data.role==='OWNER' ? 'owner.html' : 'user.html';
+      }, 700);
+    } catch(e) {
+      showErr(e.message);
+      btn.disabled=false; btn.textContent='Create Account →';
+    }
+  }
+
+  document.addEventListener('keydown', e => { if(e.key==='Enter') register(); });
+</script>
+</body>
+</html>

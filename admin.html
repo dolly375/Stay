@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard — StayEasy</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="nav"></div>
+
+<div class="dash-layout">
+  <aside class="sidebar">
+    <div class="sidebar-brand">⚙️ Admin Panel</div>
+    <nav class="sidebar-nav">
+      <button class="s-link active" onclick="tab('overview',this)">📊 Overview</button>
+      <button class="s-link"       onclick="tab('pending',this)">⏳ Pending PGs</button>
+      <button class="s-link"       onclick="tab('all-pgs',this)">🏠 All Listings</button>
+      <button class="s-link"       onclick="tab('users',this)">👤 Users</button>
+      <button class="s-link"       onclick="tab('owners',this)">🏠 Owners</button>
+      <button class="s-link"       onclick="tab('bookings',this)">📅 Bookings</button>
+      <button class="s-link" style="color:#f87171;margin-top:auto;" onclick="Auth.logout()">🚪 Logout</button>
+    </nav>
+  </aside>
+
+  <main class="dash-main">
+    <div class="dash-title">Admin Dashboard</div>
+    <div class="dash-sub">Manage listings, users and platform activity.</div>
+
+    <!-- Overview Tab -->
+    <div id="tab-overview">
+      <div class="stats-grid" id="stats-grid">
+        <div class="loader"><div class="spin"></div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-top:0.5rem;" id="quick-grid">
+        <div class="card">
+          <div class="card-header"><h3>⚡ Quick Actions</h3></div>
+          <div style="padding:1.2rem;display:flex;flex-direction:column;gap:0.6rem;">
+            <button class="btn btn-primary" onclick="tab('pending', document.querySelectorAll('.s-link')[1])">⏳ Review Pending PGs</button>
+            <button class="btn btn-ghost"   onclick="tab('all-pgs', document.querySelectorAll('.s-link')[2])">🏠 All Listings</button>
+            <button class="btn btn-ghost"   onclick="tab('users',   document.querySelectorAll('.s-link')[3])">👥 Manage Users</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>📋 Recent Pending</h3></div>
+          <div id="recent-pending" style="padding:0.5rem 1rem;"><div class="loader"><div class="spin"></div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pending Tab -->
+    <div id="tab-pending" style="display:none;">
+      <div class="card">
+        <div class="card-header">
+          <h3>⏳ Pending Approvals</h3>
+          <button class="btn btn-ghost btn-sm" onclick="loadPending()">🔄 Refresh</button>
+        </div>
+        <div id="pending-body"><div class="loader"><div class="spin"></div></div></div>
+      </div>
+    </div>
+
+    <!-- All PGs Tab -->
+    <div id="tab-all-pgs" style="display:none;">
+      <div class="card">
+        <div class="card-header">
+          <h3>🏠 All PG Listings</h3>
+          <select class="form-control" id="filter-status" onchange="loadAllPgs()"
+            style="padding:0.3rem 0.7rem;font-size:0.82rem;width:auto;">
+            <option value="">All Statuses</option>
+            <option value="APPROVED">Approved</option>
+            <option value="PENDING">Pending</option>
+            <option value="REJECTED">Rejected</option>
+          </select>
+        </div>
+        <div id="all-pgs-body"><div class="loader"><div class="spin"></div></div></div>
+      </div>
+    </div>
+
+    <!-- Users Tab -->
+    <div id="tab-users" style="display:none;">
+      <div class="card">
+        <div class="card-header">
+          <h3>👤 Customer Accounts</h3>
+          <button class="btn btn-ghost btn-sm" onclick="loadUsers()">🔄 Refresh</button>
+        </div>
+        <div id="users-body"><div class="loader"><div class="spin"></div></div></div>
+      </div>
+    </div>
+
+    <!-- Owners Tab -->
+    <div id="tab-owners" style="display:none;">
+      <div class="card">
+        <div class="card-header">
+          <h3>🏠 PG Owner Accounts</h3>
+          <button class="btn btn-ghost btn-sm" onclick="loadOwners()">🔄 Refresh</button>
+        </div>
+        <div id="owners-body"><div class="loader"><div class="spin"></div></div></div>
+      </div>
+    </div>
+
+    <!-- Bookings Tab -->
+    <div id="tab-bookings" style="display:none;">
+      <div class="card">
+        <div class="card-header">
+          <h3>📅 All Bookings</h3>
+          <button class="btn btn-ghost btn-sm" onclick="loadBookings()">🔄 Refresh</button>
+        </div>
+        <div id="bookings-body"><div class="loader"><div class="spin"></div></div></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Reject Modal -->
+<div class="overlay" id="reject-modal">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-head">
+      <h3>Reject PG Listing</h3>
+      <button class="modal-close" onclick="closeReject()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin-bottom:0.8rem;">Provide a reason (shown to the owner):</p>
+      <textarea class="form-control" id="reject-remark" rows="3"
+        placeholder="e.g. Missing clear photos, incomplete address…"></textarea>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost"  onclick="closeReject()">Cancel</button>
+      <button class="btn btn-danger" id="reject-confirm">❌ Reject</button>
+    </div>
+  </div>
+</div>
+
+<!-- PG Detail Modal -->
+<div class="overlay" id="pg-modal">
+  <div class="modal" style="max-width:620px;">
+    <div class="modal-head">
+      <h3 id="pg-modal-title">PG Details</h3>
+      <button class="modal-close" onclick="closePgModal()">✕</button>
+    </div>
+    <div class="modal-body" id="pg-modal-body"><div class="loader"><div class="spin"></div></div></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+  if (!Auth.guard('ADMIN')) {}
+  renderNav();
+
+  // ── Tab switching ──────────────────────────────────────────
+  function tab(name, btn) {
+    ['overview','pending','all-pgs','users','owners','bookings'].forEach(t => {
+      document.getElementById('tab-' + t).style.display = 'none';
+    });
+    document.querySelectorAll('.s-link').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + name).style.display = 'block';
+    if (btn) btn.classList.add('active');
+
+    if (name === 'overview') { loadStats(); loadRecentPending(); }
+    if (name === 'pending')  loadPending();
+    if (name === 'all-pgs')  loadAllPgs();
+    if (name === 'users')    loadUsers();
+    if (name === 'owners')   loadOwners();
+    if (name === 'bookings') loadBookings();
+  }
+
+  // ── Overview ───────────────────────────────────────────────
+  async function loadStats() {
+    try {
+      const s = await Http.get('/admin/dashboard');
+      document.getElementById('stats-grid').innerHTML = `
+        <div class="stat-card"><div class="stat-icon">👤</div><div class="stat-label">Users</div><div class="stat-val">${s.totalUsers}</div></div>
+        <div class="stat-card"><div class="stat-icon">🏠</div><div class="stat-label">Owners</div><div class="stat-val">${s.totalOwners}</div></div>
+        <div class="stat-card"><div class="stat-icon">⏳</div><div class="stat-label">Pending PGs</div><div class="stat-val" style="color:var(--yellow);">${s.pendingPgs}</div></div>
+        <div class="stat-card"><div class="stat-icon">✅</div><div class="stat-label">Approved PGs</div><div class="stat-val" style="color:var(--green);">${s.approvedPgs}</div></div>
+        <div class="stat-card"><div class="stat-icon">❌</div><div class="stat-label">Rejected PGs</div><div class="stat-val" style="color:var(--red);">${s.rejectedPgs}</div></div>`;
+    } catch(e) {
+      document.getElementById('stats-grid').innerHTML =
+        `<div class="alert alert-error">${e.message}</div>`;
+    }
+  }
+
+  async function loadRecentPending() {
+    try {
+      const pgs = await Http.get('/admin/pending');
+      const el  = document.getElementById('recent-pending');
+      if (!pgs.length) {
+        el.innerHTML = `<div class="empty" style="padding:1.2rem;">
+          <div class="icon" style="font-size:2rem;">✅</div><h3 style="font-size:.95rem;">All clear!</h3></div>`;
+        return;
+      }
+      el.innerHTML = pgs.slice(0, 5).map(pg => `
+        <div style="display:flex;justify-content:space-between;align-items:center;
+             padding:0.55rem 0;border-bottom:1px solid var(--border);">
+          <div>
+            <div style="font-weight:700;font-size:0.88rem;">${pg.title}</div>
+            <div style="color:var(--muted);font-size:0.78rem;">${pg.city}</div>
+          </div>
+          <div style="display:flex;gap:0.35rem;">
+            <button class="btn btn-success btn-sm" onclick="approvePg(${pg.id})">✓</button>
+            <button class="btn btn-danger  btn-sm" onclick="openReject(${pg.id})">✗</button>
+          </div>
+        </div>`).join('');
+    } catch(e) {}
+  }
+
+  // ── Pending PGs ────────────────────────────────────────────
+  async function loadPending() {
+    loader('pending-body');
+    try {
+      const pgs = await Http.get('/admin/pending');
+      if (!pgs.length) { empty('pending-body', 'No pending PGs! All caught up ✅'); return; }
+      document.getElementById('pending-body').innerHTML = `
+        <div class="table-wrap"><table>
+          <thead><tr>
+            <th>PG Name</th><th>Owner</th><th>City</th>
+            <th>Rent</th><th>Type</th><th>Submitted</th><th>Actions</th>
+          </tr></thead>
+          <tbody>
+            ${pgs.map(pg => `<tr>
+              <td>
+                <span style="color:var(--brand);cursor:pointer;font-weight:700;"
+                  onclick="openPgModal(${pg.id})">${pg.title}</span>
+              </td>
+              <td style="font-size:0.82rem;">${pg.ownerName || '—'}<br>
+                <span style="color:var(--muted);">${pg.ownerEmail || ''}</span></td>
+              <td>${pg.area}, ${pg.city}</td>
+              <td>₹${Number(pg.rent).toLocaleString('en-IN')}</td>
+              <td><span class="tag blue">${pg.roomType}</span></td>
+              <td style="font-size:0.78rem;">${fmtDate(pg.createdAt)}</td>
+              <td>
+                <div style="display:flex;gap:0.35rem;">
+                  <button class="btn btn-success btn-sm" onclick="approvePg(${pg.id})">✅ Approve</button>
+                  <button class="btn btn-danger  btn-sm" onclick="openReject(${pg.id})">❌ Reject</button>
+                </div>
+              </td>
+            </tr>`).join('')}
+          </tbody>
+        </table></div>`;
+    } catch(e) {
+      document.getElementById('pending-body').innerHTML =
+        `<div class="alert alert-error" style="margin:1rem;">${e.message}</div>`;
+    }
+  }
+
+  async function approvePg(id) {
+    try {
+      await Http.put(`/admin/approve/${id}`);
+      Toast.show('✅ PG approved and now live!', 'ok');
+      loadStats(); loadRecentPending(); loadPending();
+    } catch(e) { Toast.show(e.message, 'err'); }
+  }
+
+  // Reject modal
+  let rejectId = null;
+  function openReject(id) {
+    rejectId = id;
+    document.getElementById('reject-remark').value = '';
+    document.getElementById('reject-modal').classList.add('open');
+    document.getElementById('reject-confirm').onclick = async () => {
+      const remark = document.getElementById('reject-remark').value.trim();
+      try {
+        await Http.put(`/admin/reject/${id}`, { remark });
+        Toast.show('PG rejected.', 'ok');
+        closeReject();
+        loadStats(); loadRecentPending(); loadPending(); loadAllPgs();
+      } catch(e) { Toast.show(e.message, 'err'); }
+    };
+  }
+  function closeReject() { document.getElementById('reject-modal').classList.remove('open'); }
+
+  // ── All PGs ────────────────────────────────────────────────
+  async function loadAllPgs() {
+    loader('all-pgs-body');
+    try {
+      const all    = await Http.get('/admin/all-listings');
+      const filter = document.getElementById('filter-status')?.value || '';
+      const pgs    = filter ? all.filter(p => p.status === filter) : all;
+
+      if (!pgs.length) { empty('all-pgs-body', 'No listings found'); return; }
+
+      document.getElementById('all-pgs-body').innerHTML = `
+        <div class="table-wrap"><table>
+          <thead><tr>
+            <th>PG Name</th><th>Owner</th><th>City</th>
+            <th>Rent</th><th>Status</th><th>Actions</th>
+          </tr></thead>
+          <tbody>
+            ${pgs.map(pg => `<tr>
+              <td><span style="color:var(--brand);cursor:pointer;font-weight:700;"
+                onclick="openPgModal(${pg.id})">${pg.title}</span></td>
+              <td style="font-size:0.82rem;">${pg.ownerName || '—'}</td>
+              <td>${pg.city}</td>
+              <td>₹${Number(pg.rent).toLocaleString('en-IN')}</td>
+              <td><span class="badge badge-${pg.status}">${pg.status}</span></td>
+              <td>
+                <div style="display:flex;gap:0.35rem;flex-wrap:wrap;">
+                  ${pg.status !== 'APPROVED'
+                    ? `<button class="btn btn-success btn-sm" onclick="approvePg(${pg.id})">Approve</button>` : ''}
+                  ${pg.status !== 'REJECTED'
+                    ? `<button class="btn btn-danger btn-sm" onclick="openReject(${pg.id})">Reject</button>` : ''}
+                </div>
+              </td>
+            </tr>`).join('')}
+          </tbody>
+        </table></div>`;
+    } catch(e) {
+      document.getElementById('all-pgs-body').innerHTML =
+        `<div class="alert alert-error" style="margin:1rem;">${e.message}</div>`;
+    }
+  }
+
+  // ── PG Detail Modal ────────────────────────────────────────
+  async function openPgModal(id) {
+    document.getElementById('pg-modal').classList.add('open');
+    document.getElementById('pg-modal-body').innerHTML =
+      '<div class="loader"><div class="spin"></div></div>';
+    try {
+      const pg = await Http.get(`/pg/${id}`);
+      document.getElementById('pg-modal-title').textContent = pg.title;
+      const facs = (pg.facilities || '').split(',').filter(Boolean);
+      document.getElementById('pg-modal-body').innerHTML = `
+        ${pg.imageUrl
+          ? `<img src="http://localhost:8080${pg.imageUrl}"
+               style="width:100%;height:210px;object-fit:cover;border-radius:10px;margin-bottom:1.1rem;"
+               onerror="this.style.display='none'">`
+          : `<div style="height:130px;background:var(--brand-lt);border-radius:10px;
+               display:flex;align-items:center;justify-content:center;
+               font-size:3.5rem;margin-bottom:1.1rem;">🏠</div>`}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.9rem;margin-bottom:1rem;">
+          <div><div style="font-size:.72rem;text-transform:uppercase;font-weight:800;color:var(--muted);">City / Area</div>
+               <div style="font-weight:700;">${pg.city} — ${pg.area}</div></div>
+          <div><div style="font-size:.72rem;text-transform:uppercase;font-weight:800;color:var(--muted);">Rent</div>
+               <div style="font-size:1.3rem;font-weight:800;color:var(--brand);">
+                 ₹${Number(pg.rent).toLocaleString('en-IN')}<span style="font-size:.78rem;color:var(--muted);font-weight:400;">/mo</span></div></div>
+          <div><div style="font-size:.72rem;text-transform:uppercase;font-weight:800;color:var(--muted);">Room Type</div>
+               <span class="tag blue">${pg.roomType}</span></div>
+          <div><div style="font-size:.72rem;text-transform:uppercase;font-weight:800;color:var(--muted);">Owner</div>
+               <div style="font-weight:700;">${pg.ownerName || '—'}</div>
+               <div style="font-size:.8rem;color:var(--muted);">${pg.ownerEmail || ''}</div></div>
+        </div>
+        <div style="margin-bottom:0.9rem;">
+          <div style="font-size:.72rem;text-transform:uppercase;font-weight:800;color:var(--muted);margin-bottom:.4rem;">Address</div>
+          <div style="font-size:.88rem;">${pg.address}</div>
+        </div>
+        <div style="margin-bottom:0.9rem;">
+          <div style="font-size:.72rem;text-transform:uppercase;font-weight:800;color:var(--muted);margin-bottom:.4rem;">Facilities</div>
+          <div class="tags">
+            ${facs.length ? facs.map(f=>`<span class="tag">${f}</span>`).join('') : '<span style="color:var(--muted);">None listed</span>'}
+          </div>
+        </div>
+        ${pg.description ? `<p style="font-size:.86rem;color:var(--muted);margin-bottom:1rem;">${pg.description}</p>` : ''}
+        <div style="border-top:1px solid var(--border);padding-top:1rem;display:flex;gap:.5rem;flex-wrap:wrap;">
+          <span class="badge badge-${pg.status}" style="font-size:.82rem;padding:5px 14px;">${pg.status}</span>
+          ${pg.adminRemark ? `<span style="font-size:.82rem;color:var(--muted);">Remark: ${pg.adminRemark}</span>` : ''}
+          ${pg.status !== 'APPROVED'
+            ? `<button class="btn btn-success btn-sm" onclick="approvePg(${pg.id});closePgModal()">✅ Approve</button>` : ''}
+          ${pg.status !== 'REJECTED'
+            ? `<button class="btn btn-danger btn-sm" onclick="openReject(${pg.id});closePgModal()">❌ Reject</button>` : ''}
+        </div>`;
+    } catch(e) {
+      document.getElementById('pg-modal-body').innerHTML =
+        `<div class="alert alert-error">${e.message}</div>`;
+    }
+  }
+  function closePgModal() { document.getElementById('pg-modal').classList.remove('open'); }
+
+  // ── Users ──────────────────────────────────────────────────
+  async function loadUsers() {
+    loader('users-body');
+    try {
+      const users = await Http.get('/admin/users');
+      renderUserTable('users-body', users);
+    } catch(e) {
+      document.getElementById('users-body').innerHTML =
+        `<div class="alert alert-error" style="margin:1rem;">${e.message}</div>`;
+    }
+  }
+
+  async function loadOwners() {
+    loader('owners-body');
+    try {
+      const users = await Http.get('/admin/owners');
+      renderUserTable('owners-body', users);
+    } catch(e) {
+      document.getElementById('owners-body').innerHTML =
+        `<div class="alert alert-error" style="margin:1rem;">${e.message}</div>`;
+    }
+  }
+
+  function renderUserTable(containerId, users) {
+    if (!users.length) { empty(containerId, 'No accounts found'); return; }
+    document.getElementById(containerId).innerHTML = `
+      <div class="table-wrap"><table>
+        <thead><tr>
+          <th>Name</th><th>Email</th><th>Phone</th>
+          <th>Joined</th><th>Status</th><th>Actions</th>
+        </tr></thead>
+        <tbody>
+          ${users.map(u => `<tr>
+            <td><strong>${u.name}</strong></td>
+            <td>${u.email}</td>
+            <td style="color:var(--muted);font-size:.82rem;">${u.phone || '—'}</td>
+            <td style="font-size:.78rem;">${fmtDate(u.createdAt)}</td>
+            <td>
+              <span class="badge ${u.active ? 'badge-APPROVED' : 'badge-REJECTED'}">
+                ${u.active ? 'Active' : 'Blocked'}
+              </span>
+            </td>
+            <td>
+              <div style="display:flex;gap:.35rem;">
+                <button class="btn btn-sm ${u.active ? 'btn-danger' : 'btn-success'}"
+                  onclick="toggleUser(${u.id},'${containerId}')">
+                  ${u.active ? '🚫 Block' : '✅ Unblock'}
+                </button>
+                <button class="btn btn-ghost btn-sm"
+                  onclick="deleteUser(${u.id},'${containerId}')">🗑️</button>
+              </div>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>`;
+  }
+
+  async function toggleUser(id, containerId) {
+    try {
+      await Http.put(`/admin/users/${id}/toggle`);
+      Toast.show('User status updated.', 'ok');
+      containerId === 'users-body' ? loadUsers() : loadOwners();
+      loadStats();
+    } catch(e) { Toast.show(e.message, 'err'); }
+  }
+
+  async function deleteUser(id, containerId) {
+    if (!confirm('Permanently delete this account?')) return;
+    try {
+      await Http.del(`/admin/users/${id}`);
+      Toast.show('User deleted.', 'ok');
+      containerId === 'users-body' ? loadUsers() : loadOwners();
+      loadStats();
+    } catch(e) { Toast.show(e.message, 'err'); }
+  }
+
+  // ── Bookings ───────────────────────────────────────────────
+  async function loadBookings() {
+    loader('bookings-body');
+    try {
+      const bks = await Http.get('/booking/all');
+      if (!bks.length) { empty('bookings-body', 'No bookings yet'); return; }
+      document.getElementById('bookings-body').innerHTML = `
+        <div class="table-wrap"><table>
+          <thead><tr>
+            <th>User ID</th><th>PG ID</th><th>Move-in Date</th>
+            <th>Status</th><th>Message</th><th>Booked On</th>
+          </tr></thead>
+          <tbody>
+            ${bks.map(b => `<tr>
+              <td>#${b.userId}</td>
+              <td>#${b.pgId}</td>
+              <td>${fmtDate(b.bookingDate)}</td>
+              <td><span class="badge badge-${b.status}">${b.status}</span></td>
+              <td style="color:var(--muted);font-size:.82rem;">${b.message || '—'}</td>
+              <td style="font-size:.78rem;">${fmtDate(b.createdAt)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table></div>`;
+    } catch(e) {
+      document.getElementById('bookings-body').innerHTML =
+        `<div class="alert alert-error" style="margin:1rem;">${e.message}</div>`;
+    }
+  }
+
+  // Close modals when clicking outside
+  ['reject-modal','pg-modal'].forEach(id => {
+    document.getElementById(id).addEventListener('click', function(e) {
+      if (e.target === this) this.classList.remove('open');
+    });
+  });
+
+  // Init
+  loadStats();
+  loadRecentPending();
+</script>
+</body>
+</html>
